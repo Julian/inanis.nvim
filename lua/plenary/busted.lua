@@ -35,10 +35,7 @@ local is_headless = require("plenary.nvim_meta").is_headless
 print = function(...)
   for _, v in ipairs { ... } do
     io.stdout:write(tostring(v))
-    io.stdout:write "\t"
   end
-
-  io.stdout:write "\r\n"
 end
 
 local mod = {}
@@ -84,6 +81,7 @@ local call_inner = function(desc, func)
 end
 
 local color_table = {
+  blue = 34,
   yellow = 33,
   green = 32,
   red = 31,
@@ -97,18 +95,14 @@ local color_string = function(color, str)
   return string.format("%s[%sm%s%s[%sm", string.char(27), color_table[color] or 0, str, string.char(27), 0)
 end
 
-local SUCCESS = color_string("green", "Success")
-local FAIL = color_string("red", "Fail")
-local PENDING = color_string("yellow", "Pending")
+local SUCCESS = color_string("green", ".")
+local SLOW = color_string("blue", "~")
+local FAIL = color_string("red", "F")
+local PENDING = color_string("yellow", "P")
 
 local HEADER = string.rep("=", 40)
 
 mod.format_results = function(res)
-  print ""
-  print(color_string("green", "Success: "), #res.pass)
-  print(color_string("red", "Failed : "), #res.fail)
-  print(color_string("red", "Errors : "), #res.errs)
-  print(HEADER)
 end
 
 mod.describe = function(desc, func)
@@ -171,13 +165,16 @@ local run_each = function(tbl)
 end
 
 mod.it = function(desc, func)
+  local started = vim.loop.hrtime()
   run_each(current_before_each)
   local ok, msg, desc_stack = call_inner(desc, func)
   run_each(current_after_each)
+  local runtime_ns = vim.loop.hrtime() - started
 
   local test_result = {
     descriptions = desc_stack,
     msg = nil,
+    runtime_ns = runtime_ns,
   }
 
   -- TODO: We should figure out how to determine whether
@@ -191,8 +188,15 @@ mod.it = function(desc, func)
     print(FAIL, "||", table.concat(test_result.descriptions, " "))
     print(indent(msg, 12))
   else
+    local runtime_ms = test_result.runtime_ns / 1000 / 1000
+    local threshold = tonumber(os.getenv('SLOW_TEST_MS') or 500)
+    if runtime_ms > threshold then
+      io.stdout:write(SLOW .. '\n')
+      io.stdout:write(desc .. ' took ' .. runtime_ms .. 'ms\n')
+    else
+      io.stdout:write(SUCCESS)
+    end
     to_insert = results.pass
-    print(SUCCESS, "||", table.concat(test_result.descriptions, " "))
   end
 
   table.insert(to_insert, test_result)
@@ -201,7 +205,7 @@ end
 mod.pending = function(desc, func)
   local curr_stack = vim.deepcopy(current_description)
   table.insert(curr_stack, desc)
-  print(PENDING, "||", table.concat(curr_stack, " "))
+  print(PENDING)
 end
 
 _PlenaryBustedOldAssert = _PlenaryBustedOldAssert or assert
@@ -215,11 +219,6 @@ clear = mod.clear
 assert = require "luassert"
 
 mod.run = function(file)
-  file = file:gsub("\\", "/")
-
-  print("\n" .. HEADER)
-  print("Testing: ", file)
-
   local loaded, msg = loadfile(file)
 
   if not loaded then

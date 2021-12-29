@@ -11,6 +11,14 @@ local plenary_dir = vim.fn.fnamemodify(debug.getinfo(1).source:match "@?(.*[/\\]
 
 local harness = {}
 
+local print_ = vim.schedule_wrap(function(_, ...)
+  for _, v in ipairs { ... } do
+    io.stdout:write(tostring(v))
+  end
+
+  vim.cmd [[mode]]
+end)
+
 local print_output = vim.schedule_wrap(function(_, ...)
   for _, v in ipairs { ... } do
     io.stdout:write(tostring(v))
@@ -75,6 +83,7 @@ local function test_paths(paths, opts)
   end
 
   local outputter = headless and print_output or get_nvim_output(res.job_id)
+  local outputter_ = headless and print_ or get_nvim_output(res.job_id)
 
   local path_len = #paths
   local failure = false
@@ -132,7 +141,7 @@ local function test_paths(paths, opts)
 
   log.debug "Running..."
   for i, j in ipairs(jobs) do
-    outputter(res.bufnr, "Scheduling: " .. j.nvim_busted_path)
+    outputter_(res.bufnr, j.nvim_busted_path .. '\t')
     j:start()
     if opts.sequential then
       log.debug("... Sequential wait for job number", i)
