@@ -201,8 +201,8 @@ function harness.test_directory(directory, opts)
   test_paths(paths, opts)
 end
 
-function harness.test_file(filepath)
-  test_paths { filepath }
+function harness.test_file(filepath, opts)
+  test_paths({ filepath }, opts)
 end
 
 function harness._find_files_to_run(directory)
