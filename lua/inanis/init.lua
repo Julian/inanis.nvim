@@ -169,9 +169,11 @@ local function test_paths(paths, opts)
     table.insert(jobs, opts.timeout)
     Job.join(unpack(jobs))
     table.remove(jobs, table.getn(jobs))
-    failure = vim.iter(jobs):any(function(v)
-      return v.code ~= 0
-    end)
+    for _, each in ipairs(jobs) do
+      if each.code ~= 0 then
+        failure = true
+      end
+    end
   end
   vim.wait(100)
 
