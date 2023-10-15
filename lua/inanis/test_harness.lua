@@ -1,13 +1,8 @@
-local Path = require "plenary.path"
-local Job = require "plenary.job"
+local Job = require "inanis.job"
 
-local f = require "plenary.functional"
-local log = require "plenary.log"
-local win_float = require "plenary.window.float"
+local headless = require("inanis.nvim_meta").is_headless
 
-local headless = require("plenary.nvim_meta").is_headless
-
-local plenary_dir = vim.fn.fnamemodify(debug.getinfo(1).source:match "@?(.*[/\\])", ":p:h:h:h")
+local inanis_dir = vim.fn.fnamemodify(debug.getinfo(1).source:match "@?(.*[/\\])", ":p:h:h:h")
 
 local harness = {}
 
@@ -59,25 +54,33 @@ local function test_paths(paths, opts)
     timeout = 50000,
   }, opts or {})
 
-  vim.env.PLENARY_TEST_TIMEOUT = opts.timeout
+  vim.env.INANIS_TEST_TIMEOUT = opts.timeout
 
   local res = {}
   if not headless then
-    res = win_float.percentage_range_window(0.95, 0.70, opts.winopts)
+    local bufnr = vim.api.nvim_create_buf(false, true)
+    local win_id = vim.api.nvim_open_win(bufnr, true, {
+      relative = "editor",
+      style = "minimal",
+      width = 80,  -- FIXME: Hardcoded for now
+      height = 50,
+      row = 1,
+      col = 1,
+    })
 
-    res.job_id = vim.api.nvim_open_term(res.bufnr, {})
-    vim.api.nvim_buf_set_keymap(res.bufnr, "n", "q", ":q<CR>", {})
+    res.job_id = vim.api.nvim_open_term(bufnr, {})
+    vim.api.nvim_buf_set_keymap(bufnr, "n", "q", ":q<CR>", {})
 
-    vim.api.nvim_win_set_option(res.win_id, "winhl", "Normal:Normal")
-    vim.api.nvim_win_set_option(res.win_id, "conceallevel", 3)
-    vim.api.nvim_win_set_option(res.win_id, "concealcursor", "n")
+    vim.api.nvim_win_set_option(win_id, "winhl", "Normal:Normal")
+    vim.api.nvim_win_set_option(win_id, "conceallevel", 3)
+    vim.api.nvim_win_set_option(win_id, "concealcursor", "n")
 
     if res.border_win_id then
       vim.api.nvim_win_set_option(res.border_win_id, "winhl", "Normal:Normal")
     end
 
     if res.bufnr then
-      vim.api.nvim_buf_set_option(res.bufnr, "filetype", "PlenaryTestPopup")
+      vim.api.nvim_buf_set_option(res.bufnr, "filetype", "InanisTestPopup")
     end
     vim.cmd "mode"
   end
@@ -92,7 +95,7 @@ local function test_paths(paths, opts)
     local args = {
       "--headless",
       "-c",
-      "set rtp+=.," .. vim.fn.escape(plenary_dir, " ") .. " | runtime plugin/plenary.vim",
+      "set rtp+=.," .. vim.fn.escape(inanis_dir, " "),
     }
 
     if minimal then
@@ -107,7 +110,7 @@ local function test_paths(paths, opts)
     end
 
     table.insert(args, "-c")
-    table.insert(args, string.format('lua require("plenary.busted").run("%s")', p:absolute():gsub("\\", "\\\\")))
+    table.insert(args, string.format('lua require("inanis.busted").run("%s")', p:gsub("\\", "\\\\")))
 
     local job = Job:new {
       command = opts.nvim_cmd,
@@ -135,24 +138,20 @@ local function test_paths(paths, opts)
         vim.cmd "mode"
       end),
     }
-    job.nvim_busted_path = p.filename
+    job.nvim_busted_path = p
     return job
   end, paths)
 
-  log.debug "Running..."
   for i, j in ipairs(jobs) do
     outputter_(res.bufnr, j.nvim_busted_path .. '\t')
     j:start()
     if opts.sequential then
-      log.debug("... Sequential wait for job number", i)
       if not Job.join(j, opts.timeout) then
-        log.debug("... Timed out job number", i)
         failure = true
         pcall(function()
           j.handle:kill(15) -- SIGTERM
         end)
       else
-        log.debug("... Completed job number", i, j.code, j.signal)
         failure = failure or j.code ~= 0 or j.signal ~= 0
       end
       if failure and not opts.keep_going then
@@ -168,13 +167,11 @@ local function test_paths(paths, opts)
 
   if not opts.sequential then
     table.insert(jobs, opts.timeout)
-    log.debug "... Parallel wait"
     Job.join(unpack(jobs))
-    log.debug "... Completed jobs"
     table.remove(jobs, table.getn(jobs))
-    failure = f.any(function(_, v)
+    failure = vim.iter(jobs):any(function(v)
       return v.code ~= 0
-    end, jobs)
+    end)
   end
   vim.wait(100)
 
@@ -195,7 +192,7 @@ function harness.test_directory(directory, opts)
   -- Paths work strangely on Windows, so lets have abs paths
   if vim.fn.has "win32" == 1 or vim.fn.has "win64" == 1 then
     paths = vim.tbl_map(function(p)
-      return Path:new(directory, p.filename)
+      return p.filename
     end, paths)
   end
 
@@ -203,7 +200,7 @@ function harness.test_directory(directory, opts)
 end
 
 function harness.test_file(filepath)
-  test_paths { Path:new(filepath) }
+  test_paths { filepath }
 end
 
 function harness._find_files_to_run(directory)
@@ -224,7 +221,7 @@ function harness._find_files_to_run(directory)
     }
   end
 
-  return vim.tbl_map(Path.new, finder:sync(vim.env.PLENARY_TEST_TIMEOUT))
+  return finder:sync(vim.env.INANIS_TEST_TIMEOUT)
 end
 
 function harness._run_path(test_type, directory)
@@ -235,10 +232,10 @@ function harness._run_path(test_type, directory)
 
   for _, p in pairs(paths) do
     print " "
-    print("Loading Tests For: ", p:absolute(), "\n")
+    print("Loading Tests For: ", p, "\n")
 
     local ok, _ = pcall(function()
-      dofile(p:absolute())
+      dofile(p)
     end)
 
     if not ok then

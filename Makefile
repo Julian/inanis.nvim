@@ -1,9 +1,6 @@
-.PHONY: test generate_filetypes lint luarocks_upload test_luarocks_install
+.PHONY: test
 test:
-	nvim --headless --noplugin -u scripts/minimal.vim -c "PlenaryBustedDirectory tests/plenary/ {minimal_init = 'tests/minimal_init.vim', sequential = true}"
-
-generate_filetypes:
-	nvim --headless -c 'luafile scripts/update_filetypes_from_github.lua' -c 'qa!'
+	nvim --headless -u ./tests/minimal_init.lua -c 'lua require("inanis.test_harness").test_directory("tests/inanis", { minimal_init = "tests/minimal_init.lua" })'
 
 lint:
-	luacheck lua/plenary
+	luacheck lua/inanis
