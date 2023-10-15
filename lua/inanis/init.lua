@@ -62,7 +62,7 @@ local function test_paths(paths, opts)
     local win_id = vim.api.nvim_open_win(bufnr, true, {
       relative = "editor",
       style = "minimal",
-      width = 80,  -- FIXME: Hardcoded for now
+      width = 80, -- FIXME: Hardcoded for now
       height = 50,
       row = 1,
       col = 1,
@@ -142,8 +142,8 @@ local function test_paths(paths, opts)
     return job
   end, paths)
 
-  for i, j in ipairs(jobs) do
-    outputter_(res.bufnr, j.nvim_busted_path .. '\t')
+  for _, j in ipairs(jobs) do
+    outputter_(res.bufnr, j.nvim_busted_path .. "\t")
     j:start()
     if opts.sequential then
       if not Job.join(j, opts.timeout) then

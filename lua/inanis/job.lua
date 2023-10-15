@@ -137,7 +137,9 @@ function Job:new(o)
 
   -- enable_handlers: Do you want to do ANYTHING with the stdout/stderr of the proc
   local enable_handlers = o.enable_handlers
-  if enable_handlers == nil then enable_handlers = true end
+  if enable_handlers == nil then
+    enable_handlers = true
+  end
 
   obj.enable_handlers = enable_handlers
 

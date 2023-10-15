@@ -102,8 +102,7 @@ local PENDING = color_string("yellow", "P")
 
 local HEADER = string.rep("=", 40)
 
-mod.format_results = function(res)
-end
+mod.format_results = function(res) end
 
 mod.describe = function(desc, func)
   results.pass = results.pass or {}
@@ -189,10 +188,10 @@ mod.it = function(desc, func)
     print(indent(msg, 12))
   else
     local runtime_ms = test_result.runtime_ns / 1000 / 1000
-    local threshold = tonumber(os.getenv('SLOW_TEST_MS') or 500)
+    local threshold = tonumber(os.getenv "SLOW_TEST_MS" or 500)
     if runtime_ms > threshold then
-      io.stdout:write(SLOW .. '\n')
-      io.stdout:write(desc .. ' took ' .. runtime_ms .. 'ms\n')
+      io.stdout:write(SLOW .. "\n")
+      io.stdout:write(desc .. " took " .. runtime_ms .. "ms\n")
     else
       io.stdout:write(SUCCESS)
     end
