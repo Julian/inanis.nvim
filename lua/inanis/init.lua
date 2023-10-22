@@ -4,7 +4,7 @@ local headless = require("inanis.nvim_meta").is_headless
 
 local inanis_dir = vim.fn.fnamemodify(debug.getinfo(1).source:match "@?(.*[/\\])", ":p:h:h:h")
 
-local harness = {}
+local inanis = {}
 
 local print_ = vim.schedule_wrap(function(_, ...)
   for _, v in ipairs { ... } do
@@ -34,13 +34,13 @@ local get_nvim_output = function(job_id)
   end)
 end
 
-function harness.test_directory_command(command)
+function inanis.test_directory_command(command)
   local split_string = vim.split(command, " ")
   local directory = vim.fn.expand(table.remove(split_string, 1))
 
   local opts = assert(loadstring("return " .. table.concat(split_string, " ")))()
 
-  return harness.test_directory(directory, opts)
+  return inanis.test_directory(directory, opts)
 end
 
 local function test_paths(paths, opts)
@@ -186,10 +186,10 @@ local function test_paths(paths, opts)
   end
 end
 
-function harness.test_directory(directory, opts)
+function inanis.test_directory(directory, opts)
   print "Starting..."
   directory = directory:gsub("\\", "/")
-  local paths = harness._find_files_to_run(directory)
+  local paths = inanis._find_files_to_run(directory)
 
   -- Paths work strangely on Windows, so lets have abs paths
   if vim.fn.has "win32" == 1 or vim.fn.has "win64" == 1 then
@@ -201,11 +201,11 @@ function harness.test_directory(directory, opts)
   test_paths(paths, opts)
 end
 
-function harness.test_file(filepath, opts)
+function inanis.test_file(filepath, opts)
   test_paths({ filepath }, opts)
 end
 
-function harness._find_files_to_run(directory)
+function inanis._find_files_to_run(directory)
   local finder
   if vim.fn.has "win32" == 1 or vim.fn.has "win64" == 1 then
     -- On windows use powershell Get-ChildItem instead
@@ -226,8 +226,8 @@ function harness._find_files_to_run(directory)
   return finder:sync(vim.env.INANIS_TEST_TIMEOUT)
 end
 
-function harness._run_path(test_type, directory)
-  local paths = harness._find_files_to_run(directory)
+function inanis._run_path(test_type, directory)
+  local paths = inanis._find_files_to_run(directory)
 
   local bufnr = 0
   local win_id = 0
@@ -245,10 +245,10 @@ function harness._run_path(test_type, directory)
     end
   end
 
-  harness:run(test_type, bufnr, win_id)
+  inanis:run(test_type, bufnr, win_id)
   vim.cmd "qa!"
 
   return paths
 end
 
-return harness
+return inanis
