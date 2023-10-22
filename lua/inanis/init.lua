@@ -248,29 +248,4 @@ function inanis._find_files_to_run(directory)
   return finder:sync(vim.env.INANIS_TEST_TIMEOUT)
 end
 
-function inanis._run_path(test_type, directory)
-  local paths = inanis._find_files_to_run(directory)
-
-  local bufnr = 0
-  local win_id = 0
-
-  for _, p in pairs(paths) do
-    print " "
-    print("Loading Tests For: ", p, "\n")
-
-    local ok, _ = pcall(function()
-      dofile(p)
-    end)
-
-    if not ok then
-      print "Failed to load file"
-    end
-  end
-
-  inanis:run(test_type, bufnr, win_id)
-  vim.cmd "qa!"
-
-  return paths
-end
-
 return inanis
