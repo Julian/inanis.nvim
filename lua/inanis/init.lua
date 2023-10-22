@@ -23,6 +23,28 @@ local print_output = vim.schedule_wrap(function(_, ...)
   vim.cmd [[mode]]
 end)
 
+--- Run any kind of tests -- directories or files.
+function inanis.run(args)
+  local tests = {}
+  local opts = {}
+
+  for key, value in pairs(args) do
+    if type(key) == "number" then
+      table.insert(tests, value)
+    else
+      opts[key] = value
+    end
+  end
+
+  for _, each in ipairs(tests) do
+    if vim.fn.isdirectory(each) == 1 then
+      inanis.test_directory(each, opts)
+    else
+      inanis.test_file(each, opts)
+    end
+  end
+end
+
 local get_nvim_output = function(job_id)
   return vim.schedule_wrap(function(bufnr, ...)
     if not vim.api.nvim_buf_is_valid(bufnr) then
