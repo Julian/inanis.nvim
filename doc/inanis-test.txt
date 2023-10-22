@@ -1,4 +1,4 @@
-*plenary-test*
+*inanis-test*
 
 
 Supports (simple) busted-style testing. It implements a mock-ed busted
@@ -7,20 +7,20 @@ neovim instances.
 
 
 
-USAGE                                                     *plenary-test-usage*
+USAGE                                                     *inanis-test-usage*
 ==============================================================================
 
 To run the current spec file in a floating window, you can use the keymap
-`<Plug>PlenaryTestFile`. For example:
+`<Plug>InanisTestFile`. For example:
 >
-  nmap <leader>t <Plug>PlenaryTestFile
+  nmap <leader>t <Plug>InanisTestFile
 <
 In this case, the test is run with a minimal configuration, that includes in
-its runtimepath only plenary.nvim and the current working directory.
+its runtimepath only inanis.nvim and the current working directory.
 
 To run a whole directory from the command line, you could do something like:
 >
-  nvim --headless -c "PlenaryBustedDirectory tests/plenary/ { <options> }"
+  nvim --headless -c "InanisBustedDirectory tests/inanis/ { <options> }"
 
 Where the first argument is the directory you'd like to test. It will search
 for files with the pattern `*_spec.lua` and execute them in separate neovim
@@ -49,7 +49,7 @@ a `Makefile`.
 
 
 
-SUPPORTED BUSTED ITEMS                                   *plenary-test-busted*
+SUPPORTED BUSTED ITEMS                                   *inanis-test-busted*
 ==============================================================================
 
 So far, the only supported busted items are:
@@ -73,34 +73,34 @@ clear.
 
 
 
-COMMANDS                                               *plenary-test-commands*
+COMMANDS                                               *inanis-test-commands*
 ==============================================================================
 
-*:PlenaryBustedFile* {path}
+*:InanisBustedFile* {path}
 
   Run a test on a single `_spec.lua` file.
 
 
-*:PlenaryBustedDirectory* {path} {options}
+*:InanisBustedDirectory* {path} {options}
 
   Run tests for all `*_spec.lua` files in the given path.
 
-  {options} is a table, see |plenary-test-usage|.
+  {options} is a table, see |inanis-test-usage|.
 
 
 
 
-PLUGS                                                     *plenary-test-plugs*
+PLUGS                                                     *inanis-test-plugs*
 ==============================================================================
 
-<Plug>PlenaryTestFile
+<Plug>InanisTestFile
 
   Can be used to run a test on a single file, with a minimal configuration.
 
 
 
 
-LICENSE                                                 *plenary-test-license*
+LICENSE                                                 *inanis-test-license*
 ==============================================================================
 
 MIT license

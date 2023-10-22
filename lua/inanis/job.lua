@@ -112,7 +112,7 @@ function Job:new(o)
   obj._raw_cwd = o.cwd
   if o.env then
     if type(o.env) ~= "table" then
-      error "[plenary.job] env has to be a table"
+      error "[inanis.job] env has to be a table"
     end
 
     local transform = {}
@@ -153,7 +153,7 @@ function Job:new(o)
   end
 
   if not obj.enable_handlers and obj.enable_recording then
-    error "[plenary.job] Cannot record items but disable handlers"
+    error "[inanis.job] Cannot record items but disable handlers"
   end
 
   obj._user_on_start = o.on_start
