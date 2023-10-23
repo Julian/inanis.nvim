@@ -25,7 +25,7 @@ end)
 
 --- Run any kind of tests -- directories or files.
 function inanis.run(args)
-  local tests = {}
+  local tests = args.tests or {}
   local opts = {}
 
   for key, value in pairs(args) do
