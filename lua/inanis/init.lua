@@ -23,28 +23,6 @@ local print_output = vim.schedule_wrap(function(_, ...)
   vim.cmd [[mode]]
 end)
 
---- Run any kind of tests -- directories or files.
-function inanis.run(args)
-  local tests = args.tests or {}
-  local opts = {}
-
-  for key, value in pairs(args) do
-    if type(key) == "number" then
-      table.insert(tests, value)
-    else
-      opts[key] = value
-    end
-  end
-
-  for _, each in ipairs(tests) do
-    if vim.fn.isdirectory(each) == 1 then
-      inanis.test_directory(each, opts)
-    else
-      inanis.test_file(each, opts)
-    end
-  end
-end
-
 local get_nvim_output = function(job_id)
   return vim.schedule_wrap(function(bufnr, ...)
     if not vim.api.nvim_buf_is_valid(bufnr) then
@@ -54,15 +32,6 @@ local get_nvim_output = function(job_id)
       vim.api.nvim_chan_send(job_id, v .. "\r\n")
     end
   end)
-end
-
-function inanis.test_directory_command(command)
-  local split_string = vim.split(command, " ")
-  local directory = vim.fn.expand(table.remove(split_string, 1))
-
-  local opts = assert(loadstring("return " .. table.concat(split_string, " ")))()
-
-  return inanis.test_directory(directory, opts)
 end
 
 local function test_paths(paths, opts)
@@ -208,26 +177,30 @@ local function test_paths(paths, opts)
   end
 end
 
-function inanis.test_directory(directory, opts)
-  print "Starting..."
-  directory = directory:gsub("\\", "/")
-  local paths = inanis._find_files_to_run(directory)
+--- Run any kind of specs -- directories or files.
+function inanis.run(opts)
+  local specs = opts.specs or {}
+  opts.specs = nil
 
-  -- Paths work strangely on Windows, so lets have abs paths
-  if vim.fn.has "win32" == 1 or vim.fn.has "win64" == 1 then
-    paths = vim.tbl_map(function(p)
-      return p.filename
-    end, paths)
+  local flattened = {}
+
+  for _, each in ipairs(specs) do
+    if vim.fn.isdirectory(each) == 1 then
+      vim.list_extend(flattened, inanis._discover_specs_in(each))
+    else
+      table.insert(flattened, each)
+    end
   end
 
-  test_paths(paths, opts)
+  test_paths(flattened, opts)
 end
 
 function inanis.test_file(filepath, opts)
-  test_paths({ filepath }, opts)
+  opts = vim.tbl_deep_extend("error", { specs = { filepath } }, opts)
+  inanis.run(opts)
 end
 
-function inanis._find_files_to_run(directory)
+local function _find_via_subprocess(directory)
   local finder
   if vim.fn.has "win32" == 1 or vim.fn.has "win64" == 1 then
     -- On windows use powershell Get-ChildItem instead
@@ -246,6 +219,18 @@ function inanis._find_files_to_run(directory)
   end
 
   return finder:sync(vim.env.INANIS_TEST_TIMEOUT)
+end
+
+function inanis._discover_specs_in(directory)
+  directory = directory:gsub("\\", "/")
+  local paths = _find_via_subprocess(directory)
+  -- Paths work strangely on Windows, so lets have abs paths
+  if vim.fn.has "win32" == 1 or vim.fn.has "win64" == 1 then
+    paths = vim.tbl_map(function(p)
+      return p.filename
+    end, paths)
+  end
+  return paths
 end
 
 return inanis
