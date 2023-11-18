@@ -33,12 +33,13 @@ jobs:
             curl -sL "https://github.com/neovim/neovim/releases/download/${{ matrix.rev }}" | tar xzf - --strip-components=1 -C "${PWD}/_neovim"
           }
 
+      - uses: extractions/setup-just@v1
       - name: Run tests
         run: |
           export PATH="${PWD}/_neovim/bin:${PATH}"
           export VIM="${PWD}/_neovim/share/nvim/runtime"
           nvim --version
-          make test
+          just test
 
   stylua:
     name: stylua
@@ -64,5 +65,6 @@ jobs:
           sudo apt-get install -y luarocks
           sudo luarocks install luacheck
 
+      - uses: extractions/setup-just@v1
       - name: Lint
-        run: sudo make lint
+        run: just lint
