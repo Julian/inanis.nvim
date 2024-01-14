@@ -332,3 +332,5 @@ assert:register("assertion", "matches_error", error_matches, "assertion.error.po
 assert:register("assertion", "match_error", error_matches, "assertion.error.positive", "assertion.error.negative")
 assert:register("assertion", "truthy", truthy, "assertion.truthy.positive", "assertion.truthy.negative")
 assert:register("assertion", "falsy", falsy, "assertion.falsy.positive", "assertion.falsy.negative")
+
+require('luassert.more_assertions')  -- non-plenary assertions
