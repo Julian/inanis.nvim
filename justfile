@@ -1,5 +1,3 @@
-has_lean3 := if `leanpkg help 2>&1 >/dev/null; echo $?` == "0" { "true" } else { "false" }
-
 inanis := justfile_directory() + "/lua/inanis"
 
 suite := justfile_directory() + "/tests"
@@ -12,4 +10,5 @@ test:
 
 # Lint inanis.nvim for style.
 lint:
-    luacheck {{ inanis }}
+    luacheck {{ inanis }} {{ suite }}
+    if stylua --help 2>&1 >/dev/null; then stylua --check {{ inanis }} {{ suite }}; fi
