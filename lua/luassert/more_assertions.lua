@@ -8,7 +8,9 @@ local say = require('say')
 --- Assert a string or table is empty.
 local function is_empty(_, arguments)
   local got = arguments[1]
-  if type(got) == 'string' then
+  if not got then
+    return true
+  elseif type(got) == 'string' then
     return got == ''
   else
     return vim.tbl_isempty(got)

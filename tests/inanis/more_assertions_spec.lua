@@ -18,4 +18,8 @@ describe("is_empty", function()
   it("considers other list-like tables non-empty", function()
     assert.is_not.empty { 37 }
   end)
+
+  it("considers nil empty", function()
+    assert.is.empty(nil)
+  end)
 end)
