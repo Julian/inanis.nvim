@@ -10,7 +10,7 @@ local uv = vim.loop
 ---@field detached? boolean Spawn the child in a detached state making it a process group leader
 ---@field skip_validation? boolean Skip validating the arguments
 ---@field enable_handlers? boolean If set to false, disables all callbacks associated with output (default: true)
----@field enabled_recording? boolean
+---@field enable_recording? boolean
 ---@field on_start? fun()
 ---@field on_stdout? fun(error: string, data: string, self?: Job)
 ---@field on_stderr? fun(error: string, data: string, self?: Job)
@@ -146,7 +146,7 @@ function Job:new(o)
   -- enable_recording: Do you want to record stdout/stderr into a table.
   --                    Since it cannot be enabled when enable_handlers is false,
   --                    we try and make sure they are associated correctly.
-  if o.enabled_recording == nil then
+  if o.enable_recording == nil then
     obj.enable_recording = enable_handlers
   else
     obj.enable_recording = o.enable_recording
@@ -422,7 +422,7 @@ function Job:_execute()
   if self.writer then
     if Job.is_job(self.writer) then
       self.writer:_execute()
-    elseif type(self.writer) == "table" and vim.tbl_islist(self.writer) then
+    elseif type(self.writer) == "table" and vim.islist(self.writer) then
       local writer_len = #self.writer
       for i, v in ipairs(self.writer) do
         self.stdin:write(v)
@@ -462,12 +462,12 @@ function Job:sync(timeout, wait_interval)
 end
 
 function Job:result()
-  assert(self.enable_recording, "'enabled_recording' is not enabled for this job.")
+  assert(self.enable_recording, "'enable_recording' is not enabled for this job.")
   return self._stdout_results
 end
 
 function Job:stderr_result()
-  assert(self.enable_recording, "'enabled_recording' is not enabled for this job.")
+  assert(self.enable_recording, "'enable_recording' is not enabled for this job.")
   return self._stderr_results
 end
 

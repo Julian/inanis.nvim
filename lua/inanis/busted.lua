@@ -35,7 +35,10 @@ local is_headless = require("inanis.nvim_meta").is_headless
 print = function(...)
   for _, v in ipairs { ... } do
     io.stdout:write(tostring(v))
+    io.stdout:write "\t"
   end
+
+  io.stdout:write "\r\n"
 end
 
 local mod = {}
@@ -96,9 +99,9 @@ local color_string = function(color, str)
 end
 
 local SUCCESS = color_string("green", ".")
-local SLOW = color_string("blue", "~")
-local FAIL = color_string("red", "F")
+local FAIL = color_string("red", "!")
 local PENDING = color_string("yellow", "P")
+local SLOW = color_string("blue", "~")
 
 local HEADER = string.rep("=", 40)
 
@@ -164,11 +167,11 @@ local run_each = function(tbl)
 end
 
 mod.it = function(desc, func)
-  local started = vim.loop.hrtime()
+  local started = vim.uv.hrtime()
   run_each(current_before_each)
   local ok, msg, desc_stack = call_inner(desc, func)
   run_each(current_after_each)
-  local runtime_ns = vim.loop.hrtime() - started
+  local runtime_ns = vim.uv.hrtime() - started
 
   local test_result = {
     descriptions = desc_stack,
@@ -188,7 +191,7 @@ mod.it = function(desc, func)
     print(indent(msg, 12))
   else
     local runtime_ms = test_result.runtime_ns / 1000 / 1000
-    local threshold = tonumber(os.getenv "SLOW_TEST_MS" or 500)
+    local threshold = tonumber(os.getenv "SLOW_TEST_MS" or 1000)
     if runtime_ms > threshold then
       io.stdout:write(SLOW .. "\n")
       io.stdout:write(desc .. " took " .. runtime_ms .. "ms\n")
@@ -215,9 +218,11 @@ pending = mod.pending
 before_each = mod.before_each
 after_each = mod.after_each
 clear = mod.clear
+---@type Luassert
 assert = require "luassert"
 
 mod.run = function(file)
+  file = file:gsub("\\", "/")
   local loaded, msg = loadfile(file)
 
   if not loaded then
