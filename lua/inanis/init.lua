@@ -115,9 +115,7 @@ local function test_paths(paths, opts)
       end,
 
       on_stderr = function(_, data)
-        if path_len == 1 then
-          outputter(res.bufnr, data)
-        end
+        outputter(res.bufnr, data)
       end,
 
       on_exit = vim.schedule_wrap(function(j_self, _, _)
