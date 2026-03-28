@@ -34,12 +34,12 @@ The second argument is a Lua option table with the following fields:
                 a minimal configuration is used.
   `minimal_init`  as for `init`, but also run the neovim instance with
                 `--noplugin`.
-  `sequential`    whether to run tests sequentially (default is to run in
-                parallel).
-  `keep_going`    if `sequential`, whether to continue on test failure (default
-                true).
-  `timeout`       controls the maximum time allotted to each job in parallel or
-                sequential operation (defaults to 50,000 milliseconds).
+  `concurrent`    maximum number of test jobs to run at the same time (defaults
+                to the number of CPUs + 1).
+  `keep_going`    whether to continue starting new jobs after a failure
+                (default true).
+  `timeout`       controls the maximum time allotted to each job (defaults to
+                50,000 milliseconds).
 
 Unless `init` is given, the neovim instance is run with the `--noplugin`
 argument.

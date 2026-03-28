@@ -37,12 +37,14 @@ end
 local function test_paths(paths, opts)
   local minimal = not opts or not opts.init or opts.minimal or opts.minimal_init
 
+  local ncpus = #vim.loop.cpu_info()
+
   opts = vim.tbl_deep_extend("force", {
     nvim_cmd = vim.v.progpath,
     winopts = { winblend = 3 },
-    sequential = false,
     keep_going = true,
     timeout = 50000,
+    concurrent = ncpus + 1,
   }, opts or {})
 
   vim.env.INANIS_TEST_TIMEOUT = opts.timeout
@@ -81,6 +83,7 @@ local function test_paths(paths, opts)
 
   local path_len = #paths
   local failure = false
+  local active = 0
 
   local jobs = vim.tbl_map(function(p)
     local args = {
@@ -132,47 +135,56 @@ local function test_paths(paths, opts)
   end, paths)
 
   for _, j in ipairs(jobs) do
-    outputter_(res.bufnr, j.nvim_busted_path .. "\t")
-    j:start()
-    if opts.sequential then
-      if not Job.join(j, opts.timeout) then
+    j:add_on_exit_callback(vim.schedule_wrap(function(j_self, code, signal)
+      if code ~= 0 or signal ~= 0 then
         failure = true
-        pcall(function()
-          j.handle:kill(15) -- SIGTERM
-        end)
-      else
-        failure = failure or j.code ~= 0 or j.signal ~= 0
       end
-      if failure and not opts.keep_going then
-        break
-      end
-    end
+      active = active - 1
+    end))
   end
 
-  -- TODO: Probably want to let people know when we've completed everything.
+  for _, j in ipairs(jobs) do
+    -- Wait for a concurrency slot to open up
+    if not vim.wait(opts.timeout, function()
+      return active < opts.concurrent
+    end, 10) then
+      -- A running job exceeded the timeout; kill all still-running jobs
+      for _, running in ipairs(jobs) do
+        if running.handle and not running.is_shutdown then
+          pcall(function()
+            running.handle:kill(15) -- SIGTERM
+          end)
+        end
+      end
+      failure = true
+      break
+    end
+
+    if not opts.keep_going and failure then
+      break
+    end
+
+    active = active + 1
+    outputter_(res.bufnr, j.nvim_busted_path .. "\t")
+    j:start()
+  end
+
   if not headless then
     return
   end
 
-  if not opts.sequential then
-    table.insert(jobs, opts.timeout)
-    Job.join(unpack(jobs))
-    table.remove(jobs, table.getn(jobs))
-    for _, each in ipairs(jobs) do
-      if each.code ~= 0 then
-        failure = true
-      end
-    end
-  end
+  -- Wait for all in-flight jobs to complete
+  vim.wait(opts.timeout, function()
+    return active == 0
+  end, 10)
+
   vim.wait(100)
 
-  if headless then
-    if failure then
-      return vim.cmd "1cq"
-    end
-
-    return vim.cmd "0cq"
+  if failure then
+    return vim.cmd "1cq"
   end
+
+  return vim.cmd "0cq"
 end
 
 --- Run any kind of specs -- directories or files.
