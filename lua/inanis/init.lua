@@ -191,11 +191,14 @@ local function test_paths(paths, opts)
     local results_file = results_dir .. "/" .. i .. ".json"
 
     table.insert(args, "-c")
-    table.insert(args, string.format(
-      'lua require("inanis.busted").run("%s", "%s")',
-      p:gsub("\\", "\\\\"),
-      results_file:gsub("\\", "\\\\")
-    ))
+    table.insert(
+      args,
+      string.format(
+        'lua require("inanis.busted").run("%s", "%s")',
+        p:gsub("\\", "\\\\"),
+        results_file:gsub("\\", "\\\\")
+      )
+    )
 
     local job = Job:new {
       command = opts.nvim_cmd,
@@ -291,7 +294,9 @@ local function test_paths(paths, opts)
         file = display,
         pass = {},
         fail = {},
-        errs = { { descriptions = { display }, msg = "No results (subprocess exited with code " .. (j.code or "?") .. ")" } },
+        errs = {
+          { descriptions = { display }, msg = "No results (subprocess exited with code " .. (j.code or "?") .. ")" },
+        },
         pending = {},
       })
     end
