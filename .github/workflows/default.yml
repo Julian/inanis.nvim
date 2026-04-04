@@ -2,40 +2,46 @@ name: default
 
 on: [push, pull_request]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
   run_tests:
-    name: unit tests
+    name: tests (neovim ${{ matrix.rev }})
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - rev: nightly
-            artifact: nvim-linux-x86_64.tar.gz
-          - rev: v0.12.0
-            artifact: nvim-linux-x86_64.tar.gz
-          - rev: v0.11.7
-            artifact: nvim-linux-x86_64.tar.gz
+        rev: [nightly, v0.12.0, v0.11.7]
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
-      - run: date +%F > todays-date
-      - name: Restore cache for today's nightly.
+      - name: Determine cache key
+        id: cache-key
+        run: |
+          if [ "${{ matrix.rev }}" = "nightly" ]; then
+            echo "key=${{ runner.os }}-${{ matrix.rev }}-$(date +%F)" >> "$GITHUB_OUTPUT"
+          else
+            echo "key=${{ runner.os }}-${{ matrix.rev }}" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Restore Neovim cache
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: _neovim
-          key: ${{ runner.os }}-${{ matrix.rev }}-${{ hashFiles('todays-date') }}
-      - name: Prepare
+          key: ${{ steps.cache-key.outputs.key }}
+      - name: Install Neovim
         run: |
           test -d _neovim || {
             mkdir -p _neovim
-            curl -sL "https://github.com/neovim/neovim/releases/download/${{ matrix.rev }}/${{ matrix.artifact }}" | tar xzf - --strip-components=1 -C "${PWD}/_neovim"
+            curl -sL "https://github.com/neovim/neovim/releases/download/${{ matrix.rev }}/nvim-linux-x86_64.tar.gz" \
+              | tar xzf - --strip-components=1 -C "${PWD}/_neovim"
           }
-
       - uses: extractions/setup-just@f8a3cce218d9f83db3a2ecd90e41ac3de6cdfd9b # v3
       - name: Run tests
         run: |
@@ -47,6 +53,7 @@ jobs:
   stylua:
     name: stylua
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -54,23 +61,22 @@ jobs:
       - uses: JohnnyMorganz/stylua-action@479972f01e665acfcba96ada452c36608bdbbb5e # v4.1.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          version: latest
+          version: v2.4.0
           args: --color always --check .
 
   luacheck:
-    name: Luacheck
+    name: luacheck
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
-
-      - name: Prepare
+      - name: Install luacheck
         run: |
           sudo apt-get update
           sudo apt-get install -y luarocks
           sudo luarocks install luacheck
-
       - uses: extractions/setup-just@f8a3cce218d9f83db3a2ecd90e41ac3de6cdfd9b # v3
       - name: Lint
         run: just lint
