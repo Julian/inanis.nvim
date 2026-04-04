@@ -105,7 +105,54 @@ local SLOW = color_string("blue", "~")
 
 local HEADER = string.rep("=", 40)
 
-mod.format_results = function(res) end
+--- Write results as JSON to a file for the parent process to collect.
+local write_results = function(results_file, res, file)
+  if not results_file then
+    return
+  end
+
+  local json_results = {
+    file = file,
+    pass = {},
+    fail = {},
+    errs = {},
+    pending = {},
+  }
+
+  for _, each in ipairs(res.pass or {}) do
+    table.insert(json_results.pass, {
+      descriptions = each.descriptions,
+      runtime_ns = each.runtime_ns,
+    })
+  end
+
+  for _, each in ipairs(res.fail or {}) do
+    table.insert(json_results.fail, {
+      descriptions = each.descriptions,
+      msg = each.msg,
+      runtime_ns = each.runtime_ns,
+    })
+  end
+
+  for _, each in ipairs(res.errs or {}) do
+    table.insert(json_results.errs, {
+      descriptions = each.descriptions,
+      msg = each.msg,
+    })
+  end
+
+  for _, each in ipairs(res.pending or {}) do
+    table.insert(json_results.pending, {
+      descriptions = each.descriptions,
+    })
+  end
+
+  local f = io.open(results_file, "w")
+  if f then
+    f:write(vim.json.encode(json_results))
+    f:close()
+  end
+end
 
 mod.describe = function(desc, func)
   results.pass = results.pass or {}
@@ -187,14 +234,15 @@ mod.it = function(desc, func)
     to_insert = results.fail
     test_result.msg = msg
 
-    print(FAIL, "||", table.concat(test_result.descriptions, " "))
-    print(indent(msg, 12))
+    local test_name = table.concat(test_result.descriptions, " > ")
+    print(FAIL .. " " .. test_name)
+    print(indent(msg, 5))
   else
     local runtime_ms = test_result.runtime_ns / 1000 / 1000
     local threshold = tonumber(os.getenv "SLOW_TEST_MS" or 1000)
     if runtime_ms > threshold then
-      io.stdout:write(SLOW .. "\n")
-      io.stdout:write(desc .. " took " .. runtime_ms .. "ms\n")
+      local test_name = table.concat(desc_stack, " > ")
+      print(SLOW .. " " .. test_name .. " (" .. string.format("%.0f", runtime_ms) .. "ms)")
     else
       io.stdout:write(SUCCESS)
     end
@@ -205,9 +253,11 @@ mod.it = function(desc, func)
 end
 
 mod.pending = function(desc, func)
+  results.pending = results.pending or {}
   local curr_stack = vim.deepcopy(current_description)
   table.insert(curr_stack, desc)
-  print(PENDING)
+  io.stdout:write(PENDING)
+  table.insert(results.pending, { descriptions = curr_stack })
 end
 
 _InanisBustedOldAssert = _InanisBustedOldAssert or assert
@@ -221,8 +271,9 @@ clear = mod.clear
 ---@type Luassert
 assert = require "luassert"
 
-mod.run = function(file)
+mod.run = function(file, results_file)
   file = file:gsub("\\", "/")
+  local display_name = vim.fn.fnamemodify(file, ":t")
   local loaded, msg = loadfile(file)
 
   if not loaded then
@@ -230,6 +281,12 @@ mod.run = function(file)
     print "FAILED TO LOAD FILE"
     print(color_string("red", msg))
     print(HEADER)
+    write_results(results_file, {
+      pass = {},
+      fail = {},
+      errs = { { descriptions = { display_name }, msg = msg } },
+      pending = {},
+    }, display_name)
     if is_headless then
       return vim.cmd "2cq"
     else
@@ -238,10 +295,33 @@ mod.run = function(file)
   end
 
   coroutine.wrap(function()
-    loaded()
+    local ok, run_err = xpcall(loaded, function(err)
+      return err .. "\n" .. debug.traceback("", 2)
+    end)
+    if not ok then
+      -- Flush any dots from tests that ran before the crash
+      print ""
+      write_results(results_file, {
+        pass = {},
+        fail = {},
+        errs = { { descriptions = { display_name }, msg = run_err } },
+        pending = {},
+      }, display_name)
+      if is_headless then
+        return vim.cmd "2cq"
+      else
+        return
+      end
+    end
 
     -- If nothing runs (empty file without top level describe)
     if not results.pass then
+      write_results(results_file, {
+        pass = {},
+        fail = {},
+        errs = {},
+        pending = {},
+      }, display_name)
       if is_headless then
         return vim.cmd "0cq"
       else
@@ -249,16 +329,14 @@ mod.run = function(file)
       end
     end
 
-    mod.format_results(results)
+    print ""
+    write_results(results_file, results, display_name)
 
     if #results.errs ~= 0 then
-      print("We had an unexpected error: ", vim.inspect(results.errs), vim.inspect(results))
       if is_headless then
         return vim.cmd "2cq"
       end
     elseif #results.fail > 0 then
-      print "Tests Failed. Exit: 1"
-
       if is_headless then
         return vim.cmd "1cq"
       end

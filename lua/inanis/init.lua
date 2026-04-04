@@ -6,14 +6,6 @@ local inanis_dir = vim.fn.fnamemodify(debug.getinfo(1).source:match "@?(.*[/\\])
 
 local inanis = {}
 
-local print_ = vim.schedule_wrap(function(_, ...)
-  for _, v in ipairs { ... } do
-    io.stdout:write(tostring(v))
-  end
-
-  vim.cmd [[mode]]
-end)
-
 local print_output = vim.schedule_wrap(function(_, ...)
   for _, v in ipairs { ... } do
     io.stdout:write(tostring(v))
@@ -22,6 +14,98 @@ local print_output = vim.schedule_wrap(function(_, ...)
 
   vim.cmd [[mode]]
 end)
+
+local color_table = {
+  blue = 34,
+  yellow = 33,
+  green = 32,
+  red = 31,
+}
+
+local function color_string(color, str)
+  return string.format("%s[%sm%s%s[%sm", string.char(27), color_table[color] or 0, str, string.char(27), 0)
+end
+
+local function indent(msg, spaces)
+  local prefix = string.rep(" ", spaces or 4)
+  return prefix .. msg:gsub("\n", "\n" .. prefix)
+end
+
+local HEADER = string.rep("=", 40)
+
+local function format_combined_results(all_results)
+  local total_pass = 0
+  local total_fail = 0
+  local total_err = 0
+  local total_pending = 0
+  local all_failures = {}
+  local all_errors = {}
+  local all_pending = {}
+
+  for _, r in ipairs(all_results) do
+    total_pass = total_pass + #r.pass
+    total_fail = total_fail + #r.fail
+    total_err = total_err + #r.errs
+    total_pending = total_pending + #r.pending
+
+    for _, each in ipairs(r.fail) do
+      table.insert(all_failures, each)
+    end
+    for _, each in ipairs(r.errs) do
+      table.insert(all_errors, each)
+    end
+    for _, each in ipairs(r.pending) do
+      table.insert(all_pending, each)
+    end
+  end
+
+  io.stdout:write(HEADER .. "\n")
+
+  if total_fail > 0 then
+    io.stdout:write(color_string("red", "Failed Tests:") .. "\n\n")
+    for i, each in ipairs(all_failures) do
+      io.stdout:write(color_string("red", string.format("  %d) %s", i, table.concat(each.descriptions, " > "))) .. "\n")
+      if each.msg then
+        io.stdout:write(indent(each.msg, 5) .. "\n")
+      end
+      io.stdout:write "\n"
+    end
+  end
+
+  if total_err > 0 then
+    io.stdout:write(color_string("red", "Errors:") .. "\n\n")
+    for i, each in ipairs(all_errors) do
+      io.stdout:write(color_string("red", string.format("  %d) %s", i, table.concat(each.descriptions, " > "))) .. "\n")
+      if each.msg then
+        io.stdout:write(indent(each.msg, 5) .. "\n")
+      end
+      io.stdout:write "\n"
+    end
+  end
+
+  if total_pending > 0 then
+    io.stdout:write(color_string("yellow", "Pending:") .. "\n")
+    for _, each in ipairs(all_pending) do
+      io.stdout:write(color_string("yellow", "  - " .. table.concat(each.descriptions, " > ")) .. "\n")
+    end
+    io.stdout:write "\n"
+  end
+
+  local parts = {}
+  table.insert(parts, color_string("green", total_pass .. " passed"))
+  if total_fail > 0 then
+    table.insert(parts, color_string("red", total_fail .. " failed"))
+  end
+  if total_err > 0 then
+    table.insert(parts, color_string("red", total_err .. (total_err == 1 and " error" or " errors")))
+  end
+  if total_pending > 0 then
+    table.insert(parts, color_string("yellow", total_pending .. " pending"))
+  end
+
+  io.stdout:write(table.concat(parts, ", ") .. "\n")
+  io.stdout:write(HEADER .. "\n")
+end
 
 local get_nvim_output = function(job_id)
   return vim.schedule_wrap(function(bufnr, ...)
@@ -79,13 +163,14 @@ local function test_paths(paths, opts)
   end
 
   local outputter = headless and print_output or get_nvim_output(res.job_id)
-  local outputter_ = headless and print_ or get_nvim_output(res.job_id)
 
-  local path_len = #paths
   local failure = false
   local active = 0
+  local results_dir = vim.fn.tempname()
+  vim.fn.mkdir(results_dir, "p")
 
-  local jobs = vim.tbl_map(function(p)
+  local jobs = {}
+  for i, p in ipairs(paths) do
     local args = {
       "--headless",
       "-c",
@@ -103,43 +188,44 @@ local function test_paths(paths, opts)
       table.insert(args, opts.init)
     end
 
+    local results_file = results_dir .. "/" .. i .. ".json"
+
     table.insert(args, "-c")
-    table.insert(args, string.format('lua require("inanis.busted").run("%s")', p:gsub("\\", "\\\\")))
+    table.insert(args, string.format(
+      'lua require("inanis.busted").run("%s", "%s")',
+      p:gsub("\\", "\\\\"),
+      results_file:gsub("\\", "\\\\")
+    ))
 
     local job = Job:new {
       command = opts.nvim_cmd,
       args = args,
 
-      -- Can be turned on to debug
       on_stdout = function(_, data)
-        if path_len == 1 then
-          outputter(res.bufnr, data)
-        end
+        outputter(res.bufnr, data)
       end,
 
       on_stderr = function(_, data)
         outputter(res.bufnr, data)
       end,
 
-      on_exit = vim.schedule_wrap(function(j_self, _, _)
-        if path_len ~= 1 then
-          outputter(res.bufnr, unpack(j_self:stderr_result()))
-          outputter(res.bufnr, unpack(j_self:result()))
-        end
-
+      on_exit = vim.schedule_wrap(function(_, _, _)
         vim.cmd "mode"
       end),
     }
     job.nvim_busted_path = p
-    return job
-  end, paths)
+    jobs[i] = job
+  end
 
   for _, j in ipairs(jobs) do
-    j:add_on_exit_callback(vim.schedule_wrap(function(j_self, code, signal)
+    j:add_on_exit_callback(vim.schedule_wrap(function(_, code, signal)
       if code ~= 0 or signal ~= 0 then
         failure = true
       end
       active = active - 1
+      if active == 0 and not headless then
+        vim.fn.delete(results_dir, "rf")
+      end
     end))
   end
 
@@ -165,7 +251,6 @@ local function test_paths(paths, opts)
     end
 
     active = active + 1
-    outputter_(res.bufnr, j.nvim_busted_path .. "\t")
     j:start()
   end
 
@@ -179,6 +264,45 @@ local function test_paths(paths, opts)
   end, 10)
 
   vim.wait(100)
+
+  -- Collect JSON results from temp files
+  local all_results = {}
+  for i, j in ipairs(jobs) do
+    local results_file = results_dir .. "/" .. i .. ".json"
+    local display = vim.fn.fnamemodify(j.nvim_busted_path or "unknown", ":t")
+    local f = io.open(results_file, "r")
+    if f then
+      local content = f:read "*a"
+      f:close()
+      local ok, decoded = pcall(vim.json.decode, content)
+      if ok and decoded then
+        table.insert(all_results, decoded)
+      else
+        table.insert(all_results, {
+          file = display,
+          pass = {},
+          fail = {},
+          errs = { { descriptions = { display }, msg = "Failed to parse results JSON" } },
+          pending = {},
+        })
+      end
+    else
+      table.insert(all_results, {
+        file = display,
+        pass = {},
+        fail = {},
+        errs = { { descriptions = { display }, msg = "No results (subprocess exited with code " .. (j.code or "?") .. ")" } },
+        pending = {},
+      })
+    end
+  end
+
+  -- Clean up temp dir
+  vim.fn.delete(results_dir, "rf")
+
+  if #all_results > 0 then
+    format_combined_results(all_results)
+  end
 
   if failure then
     return vim.cmd "1cq"
