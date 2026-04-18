@@ -222,6 +222,8 @@ local function test_paths(paths, opts)
 
   for _, j in ipairs(jobs) do
     j:add_on_exit_callback(vim.schedule_wrap(function(_, code, signal)
+      j.code = code
+      j.signal = signal
       if code ~= 0 or signal ~= 0 then
         failure = true
       end
@@ -295,7 +297,7 @@ local function test_paths(paths, opts)
         pass = {},
         fail = {},
         errs = {
-          { descriptions = { display }, msg = "No results (subprocess exited with code " .. (j.code or "?") .. ")" },
+          { descriptions = { display }, msg = "No results (subprocess exited with code " .. (j.code or "?") .. ", signal " .. (j.signal or "?") .. ")" },
         },
         pending = {},
       })
