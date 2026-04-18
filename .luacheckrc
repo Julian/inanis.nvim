@@ -23,6 +23,8 @@ read_globals = {
 }
 
 exclude_files = {
+  "lua/luassert/**/*.lua",
+  "lua/say.lua",
 }
 
 files = {

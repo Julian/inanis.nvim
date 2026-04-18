@@ -297,7 +297,14 @@ local function test_paths(paths, opts)
         pass = {},
         fail = {},
         errs = {
-          { descriptions = { display }, msg = "No results (subprocess exited with code " .. (j.code or "?") .. ", signal " .. (j.signal or "?") .. ")" },
+          {
+            descriptions = { display },
+            msg = "No results (subprocess exited with code "
+              .. (j.code or "?")
+              .. ", signal "
+              .. (j.signal or "?")
+              .. ")",
+          },
         },
         pending = {},
       })
